@@ -49,6 +49,12 @@ smart-tourism-backend/data/tourism.db
 *.bak
 __pycache__/
 
+# Course report exports and generated docs kept locally
+docs/*.pdf
+docs/*.docx
+docs/*周报*
+docs/*录屏*
+
 # IDE and OS files
 .idea/
 .vscode/
