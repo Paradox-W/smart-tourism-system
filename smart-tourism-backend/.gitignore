@@ -1,0 +1,32 @@
+# 构建产物
+cmake-build-*/
+build/
+out/
+bin/
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+*.pdb
+
+# 数据库文件（运行时生成）
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# IDE 文件
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 下载脚本（一次性使用）
+download_deps.py
+
+# 操作系统文件
+.DS_Store
+Thumbs.db

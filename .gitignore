@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+smart-tourism-frontend/node_modules/
+
+# Frontend build output
+dist/
+smart-tourism-frontend/dist/
+smart-tourism-frontend/.vite/
+
+# Backend build output
+build/
+out/
+bin/
+cmake-build-*/
+smart-tourism-backend/build/
+smart-tourism-backend/out/
+smart-tourism-backend/bin/
+smart-tourism-backend/cmake-build-*/
+
+# Runtime databases and generated seed files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/generated_demo_seed.sql
+smart-tourism-backend/data/generated_demo_seed.sql
+data/tourism.db
+smart-tourism-backend/data/tourism.db
+
+# Native build artifacts
+*.exe
+*.dll
+*.o
+*.obj
+*.a
+*.lib
+*.pdb
+
+# Logs and local env
+*.log
+*.local
+.env
+.env.*
+
+# Generated document/build side files
+*.aux
+*.out
+*.toc
+*.bak
+__pycache__/
+
+# IDE and OS files
+.idea/
+.vscode/
+.vs/
+.workbuddy/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

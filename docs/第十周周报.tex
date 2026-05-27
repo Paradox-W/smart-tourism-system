@@ -1,0 +1,316 @@
+\documentclass[12pt,a4paper]{article}
+
+% ==================== 宏包 ====================
+\usepackage[UTF8]{ctex}
+\usepackage{geometry}
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{amsmath}
+\usepackage{multicol}
+\usepackage{tcolorbox}
+
+% ==================== 样式 ====================
+\hypersetup{colorlinks=true, linkcolor=black!70, urlcolor=blue!60!black}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\small 数据结构课程设计\quad 第十周周报}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red!60!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    breaklines=true,
+    tabsize=4,
+    language=C++
+}
+
+\definecolor{headblue}{RGB}{41, 65, 122}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+
+\begin{document}
+
+% ==================== 标题 ====================
+\begin{center}
+    {\LARGE\bfseries\color{headblue} 数据结构课程设计周报}\\[6pt]
+    {\Large 第十周（2026年5月5日\,--\,5月11日）}\\[12pt]
+    \begin{tabular}{ll}
+        \bfseries 课题名称 & 基于智能体的个性化旅游系统 \\
+        \bfseries 指导教师 & 郭岗 \\
+        \bfseries 小组成员 & 李佳(2024211216)、王皓轩(2024211213)、崔天睿 \\
+    \end{tabular}
+\end{center}
+
+\rule{\textwidth}{0.8pt}
+
+% ==================== 一、本周工作概述 ====================
+\section*{一、本周工作概述}
+
+本周主要围绕\textbf{C++后端系统}展开工作，重点完成了后端五层架构的设计与代码实现、九大核心算法模块的编码与单元测试、RESTful API路由层的对接，以及前后端联调过程中的问题定位与修复。后端系统已成功编译运行（SmartTourismSystem.exe，约8.5MB），所有API端点可正常响应。
+
+% ==================== 二、后端架构设计 ====================
+\section*{二、后端架构设计}
+
+\subsection*{2.1 整体架构}
+
+后端采用\textbf{模块化单体分层架构}，共分五层，各层职责清晰、单向依赖：
+
+\begin{center}
+\begin{tabular}{>{\bfseries}l l l}
+    \toprule
+    层次 & 职责 & 关键文件 \\
+    \midrule
+    表示层（HTTP路由） & RESTful API端点定义、参数校验、请求分发 & http\_server.h/cpp \\
+    接口层（Controller） & 统一响应格式、错误码封装 & response.h \\
+    业务逻辑层（Service） & 核心业务编排、算法调用、结果组装 & *\_service.h \\
+    算法引擎层（Algorithm） & 自实现数据结构与算法、无IO依赖 & algorithm/*.h \\
+    数据访问层（Repository） & SQLite数据库CRUD、SQL封装 & db\_connection.h/cpp, *_repo.h \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{2.2 技术选型}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{语言}：C++17，核心算法层自实现数据结构（不依赖STL容器）
+    \item \textbf{HTTP服务}：cpp-httplib v0.15.3（header-only，轻量级）
+    \item \textbf{JSON}：nlohmann/json（header-only）
+    \item \textbf{数据库}：SQLite3 3.45.0（amalgamation方式集成）
+    \item \textbf{构建}：CMake 3.15+，MinGW GCC 13.1 编译
+\end{itemize}
+
+% ==================== 三、核心算法模块 ====================
+\section*{三、核心算法模块实现}
+
+九大核心算法模块全部采用header-only风格，自实现底层数据结构，算法层无IO依赖，便于独立测试和复用。
+
+\begin{center}
+\begin{longtable}{>{\bfseries}l p{3.2cm} p{6.5cm}}
+    \toprule
+    模块 & 核心算法 & 说明与复杂度 \\
+    \midrule
+    \endfirsthead
+    \toprule
+    模块 & 核心算法 & 说明与复杂度 \\
+    \midrule
+    \endhead
+    \bottomrule
+    \endlastfoot
+
+    graph.h & 邻接表图 & DynamicArray替代vector，支持多权值边（距离/时间/拥挤度），有向/无向图 \\
+
+    heap.h & 泛型大根堆 + Top-K & $O(n + k\log n)$，支持top\_k\_largest/smallest/by\_score三种模式 \\
+
+    dijkstra.h & Dijkstra最短路径 & 邻接表+优先队列，$O((V+E)\log V)$，支持三种策略：最短距离/最短时间/混合交通工具 \\
+
+    tsp.h & TSP近似算法 & 最近邻启发式+2-opt局部优化，两段式路径拼接，时间与精度平衡 \\
+
+    hash\_table.h & HashMap & 链地址法，动态扩容，泛型模板+IntHashMap特化 \\
+
+    trie.h & Trie前缀树 & HashMap子节点，支持前缀搜索、词频统计 \\
+
+    inverted\_index.h & 倒排索引 & TF-IDF简化版，AND查询，交集过滤 \\
+
+    huffman.h & Huffman编码 & 频率统计$\to$建树$\to$编解码一步完成，支持压缩率统计 \\
+
+    edit\_distance.h & 编辑距离 & 动态规划，$O(mn)$，支持相似度计算与模糊匹配Top-K \\
+\end{longtable}
+\end{center}
+
+\subsection*{3.1 各功能模块算法调用关系}
+
+\begin{center}
+\begin{tabular}{>{\bfseries}l l}
+    \toprule
+    功能模块 & 使用的核心算法 \\
+    \midrule
+    旅游推荐 & MaxHeap Top-K排序 + Trie前缀搜索 + HashMap精确查找 \\
+    路线规划 & Dijkstra（单点最短路径）+ TSP近似（多点参观）+ 多层图Dijkstra（交通工具）\\
+    场所查询 & Dijkstra求实际路径距离 + 排序 \\
+    日记管理 & 堆排序 + HashMap + 倒排索引全文检索 + Huffman压缩 \\
+    美食推荐 & MaxHeap Top-K排序 + 编辑距离模糊查询 + HashMap过滤 \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+% ==================== 四、RESTful API ====================
+\section*{四、RESTful API设计}
+
+后端提供完整的RESTful API，共5个功能模块、15个端点，统一JSON响应格式（code/message/data）。
+
+\begin{center}
+\begin{longtable}{l l l p{5cm}}
+    \toprule
+    方法 & 路径 & 功能 & 参数说明 \\
+    \midrule
+    \endfirsthead
+    \toprule
+    方法 & 路径 & 功能 & 参数说明 \\
+    \midrule
+    \endhead
+    \bottomrule
+    \endlastfoot
+
+    GET  & /api/spots/recommend & 景点推荐 & sort\_by, limit, type, category \\
+    GET  & /api/spots/search    & 景点搜索 & keyword, limit \\
+    GET  & /api/spots/:id       & 景点详情 & id \\
+    GET  & /api/spots           & 景点列表 & sort\_by, order, type, page, page\_size \\
+
+    POST & /api/route/single    & 单点路线规划 & JSON body: area\_id, from, to, strategy \\
+    POST & /api/route/multi     & 多点路线规划 & JSON body: area\_id, from, targets, strategy \\
+    GET  & /api/map/graph/:areaId & 地图图数据 & area\_id \\
+
+    GET  & /api/facilities/nearby & 附近设施查询 & area\_id, node\_id, category, radius \\
+
+    GET  & /api/diaries         & 日记列表 & sort\_by, order, page, page\_size \\
+    GET  & /api/diaries/:id     & 日记详情 & id \\
+    POST & /api/diaries         & 创建日记 & JSON body \\
+    PUT  & /api/diaries/:id     & 更新日记 & id + JSON body \\
+    DELETE & /api/diaries/:id   & 删除日记 & id \\
+    GET  & /api/diaries/search  & 日记搜索 & keyword, mode(fulltext/exact), limit \\
+    POST & /api/diaries/compress & Huffman压缩 & JSON body \\
+    POST & /api/diaries/:id/rate & 日记评分 & id + JSON body \\
+
+    GET  & /api/foods/recommend & 美食推荐 & area\_id, sort\_by, limit, cuisine \\
+    GET  & /api/foods/search    & 美食搜索 & area\_id, keyword, limit \\
+\end{longtable}
+\end{center}
+
+% ==================== 五、数据库设计 ====================
+\section*{五、数据库设计}
+
+采用SQLite3，共设计12张表，涵盖景区、建筑、设施、道路、用户、日记、美食等实体。
+
+\begin{center}
+\begin{tabular}{l l}
+    \toprule
+    表名 & 用途 \\
+    \midrule
+    scenic\_areas    & 景区/校园 \\
+    scenic\_spots    & 景点/建筑 \\
+    facilities       & 服务设施（商店、卫生间、餐厅等） \\
+    roads            & 道路（含距离、拥挤度、理想速度、类型） \\
+    users            & 用户信息 \\
+    user\_preferences & 用户偏好 \\
+    diaries          & 旅游日记 \\
+    diary\_ratings   & 日记评分 \\
+    foods            & 美食信息 \\
+    food\_categories & 菜系分类 \\
+    area\_nodes      & 区域内导航节点 \\
+    node\_edges      & 节点间连接边 \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+% ==================== 六、编译与测试 ====================
+\section*{六、编译与测试}
+
+\subsection*{6.1 编译环境}
+
+\begin{itemize}[leftmargin=2em]
+    \item IDE：CLion 2024.x
+    \item 编译器：MinGW GCC 13.1
+    \item CMake 3.15+，C++17标准
+    \item 产物：SmartTourismSystem.exe（约8.5MB）
+\end{itemize}
+
+\subsection*{6.2 编译问题及解决}
+
+在编译过程中遇到了若干兼容性问题，均已定位并修复：
+
+\begin{center}
+\begin{tabular}{p{4.5cm} p{7cm}}
+    \toprule
+    \bfseries 问题 & \bfseries 解决方案 \\
+    \midrule
+    cpp-httplib v0.42要求Windows 10+，CLion MinGW binutils不支持gdwarf-5 & 降级httplib.h至v0.15.3 \\
+    GCC 13默认-gdwarf-5与旧binutils as不兼容 & CMake中添加-compile\_option -gdwarf-4 \\
+    DynamicArray缺少move assignment/expand() & 添加move赋值运算符，expand()改用placement new \\
+    HashMap缺少move insert重载 & 添加move insert重载和move assignment \\
+    InvertedIndex的PostingList缺少move assignment & 补充move赋值运算符 \\
+    route\_service.h中IntHashMap缺少迭代器 & 添加find/end迭代器接口 \\
+    response.h中ok()重载歧义 & 修改重载签名消除歧义 \\
+    db\_connection.h缺少头文件 & 添加cstdint、cstring头文件 \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{6.3 单元测试}
+
+算法模块编写了20个单元测试用例（tests/test\_algorithms.cpp，669行），覆盖所有九大算法模块，可通过CMake选项 \texttt{-DRUN\_ALGORITHM\_TESTS=ON} 编译运行。
+
+% ==================== 七、代码量统计 ====================
+\section*{七、后端代码量统计}
+
+\begin{center}
+\begin{tabular}{l r r}
+    \toprule
+    \bfseries 模块 & \bfseries 文件数 & \bfseries 代码行数 \\
+    \midrule
+    算法引擎层（algorithm/） & 9 & 2,782 \\
+    业务逻辑层（service/）  & 5 & 1,352 \\
+    数据访问层（repository/） & 4 & 1,048 \\
+    HTTP服务层（server/）    & 4 & 579 \\
+    入口与配置（main.cpp, CMakeLists.txt） & 2 & 252 \\
+    单元测试（tests/）       & 1 & 669 \\
+    数据库脚本（data/）      & 1 & --- \\
+    \midrule
+    \textbf{合计} & \textbf{26} & \textbf{6,682+} \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+% ==================== 八、前后端联调 ====================
+\section*{八、前后端联调}
+
+本周完成前后端联调，定位并修复了以下关键问题：
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{响应码不一致}：前端http.ts拦截器判断 \texttt{res.code !== 0} 为错误，而后端返回 \texttt{code=200}，导致正常数据被丢弃。修复：将前端判断条件改为 \texttt{res.code !== 200}。
+    \item \textbf{数据双重嵌套}：后端RecommendService返回 \texttt{\{data:[...], total\}}，经Response::ok()再次包装后产生双重嵌套。修复：在路由层将Service返回结果解包平铺。
+    \item \textbf{数据库路径}：确认CLion工作目录为 \texttt{smart-tourism-backend/}，初始化数据库需放在 \texttt{data/} 子目录。
+    \item \textbf{CORS跨域}：后端配置了全局CORS中间件，支持前端开发服务器跨域请求。
+\end{enumerate}
+
+% ==================== 九、下周计划 ====================
+\section*{九、下周计划}
+
+\begin{enumerate}[leftmargin=2em]
+    \item 完善真实景区/校园数据入库（景区$\geq$200、建筑$\geq$20、设施$\geq$50、道路边$\geq$200）
+    \item 实现室内导航功能（多层图Dijkstra，教学楼/博物馆内部导航）
+    \item 实现多交通工具混合策略（自行车/步行/电瓶车，考虑拥挤度）
+    \item 编写后端性能测试（算法时间复杂度实测对比）
+    \item 补充第九周周报
+\end{enumerate}
+
+% ==================== 十、AI辅助开发 ====================
+\section*{十、AI辅助开发说明}
+
+本周后端开发过程中，全程使用WorkBuddy（AI编程智能体）辅助完成：
+\begin{itemize}[leftmargin=2em]
+    \item 架构设计方案讨论与文档生成
+    \item 九大算法模块的代码生成与调试
+    \item 编译错误定位与修复（如gdwarf-5兼容性、move语义缺失等）
+    \item RESTful API路由层代码生成
+    \item 单元测试用例编写
+    \item 前后端联调问题排查
+\end{itemize}
+
+\end{document}
