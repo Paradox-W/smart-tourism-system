@@ -22,6 +22,8 @@
 #include <string>
 #include <cstring>
 #include <utility>
+#include <mutex>
+#include <memory>
 
 using json = nlohmann::json;
 
@@ -29,29 +31,28 @@ namespace service {
 
 class DiaryService {
 private:
-    // 静态缓存：倒排索引（懒加载）
+    static std::mutex& index_mutex() {
+        static std::mutex mutex;
+        return mutex;
+    }
+
+    // 静态缓存：倒排索引（懒加载，线程安全）
     static algorithm::InvertedIndex& get_index() {
         static algorithm::InvertedIndex index;
-        static bool initialized = false;
-
-        if (!initialized) {
+        static std::once_flag init_flag;
+        std::call_once(init_flag, [&]() {
             rebuild_index(index);
-            initialized = true;
-        }
-
+        });
         return index;
     }
 
-    // 静态缓存：标题 HashMap（标题 -> 日记ID）
+    // 静态缓存：标题 HashMap（标题 -> 日记ID，线程安全）
     static algorithm::HashMap<std::string, int>& get_title_map() {
         static algorithm::HashMap<std::string, int> title_map(64);
-        static bool initialized = false;
-
-        if (!initialized) {
+        static std::once_flag init_flag;
+        std::call_once(init_flag, [&]() {
             rebuild_title_map(title_map);
-            initialized = true;
-        }
-
+        });
         return title_map;
     }
 
@@ -101,6 +102,7 @@ private:
      */
     static void refresh_index() {
         static bool initialized = false;
+        std::lock_guard<std::mutex> lock(index_mutex());
         // 通过重建来刷新
         try {
             json diaries = repository::DiaryRepo::get_all_for_indexing();
@@ -152,6 +154,50 @@ private:
         return result;
     }
 
+    /**
+     * @brief 将 base64 字符串解码为字节数组
+     * @param input base64 编码字符串
+     * @param output 输出字节数组（调用者分配）
+     * @param max_len 输出缓冲区最大长度
+     * @return 实际解码字节数
+     */
+    static int base64_decode(const std::string& input, unsigned char* output, int max_len) {
+        static const int decode_table[256] = {
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
+            52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,
+            -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
+            15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
+            -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+            41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+            -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+        };
+
+        int out_len = 0;
+        int val = 0, valb = -8;
+        for (size_t i = 0; i < input.size() && out_len < max_len; i++) {
+            unsigned char c = static_cast<unsigned char>(input[i]);
+            if (c == '=') break;
+            int d = decode_table[c];
+            if (d == -1) continue;
+            val = (val << 6) | d;
+            valb += 6;
+            if (valb >= 0) {
+                output[out_len++] = static_cast<unsigned char>((val >> valb) & 0xFF);
+                valb -= 8;
+            }
+        }
+        return out_len;
+    }
+
 public:
     /**
      * @brief 获取日记列表
@@ -198,9 +244,12 @@ public:
             std::string content = body.value("content", "");
             std::string dest = body.value("destination", "");
             int dest_id = body.value("destination_id", 0);
-            std::string tags = body.value("tags", "");
-            std::string images = body.value("images", "");
-            std::string videos = body.value("videos", "");
+            std::string tags = body["tags"].is_array() ? body["tags"].dump()
+                             : body.value("tags", std::string("[]"));
+            std::string images = body["images"].is_array() ? body["images"].dump()
+                               : body.value("images", std::string("[]"));
+            std::string videos = body["videos"].is_array() ? body["videos"].dump()
+                               : body.value("videos", std::string("[]"));
 
             if (user_id <= 0 || title.empty()) {
                 result["error"] = "参数错误: user_id 和 title 不能为空";
@@ -299,6 +348,7 @@ public:
 
             if (mode == "exact") {
                 // HashMap 精确查找
+                std::lock_guard<std::mutex> lock(index_mutex());
                 auto& title_map = get_title_map();
                 const int* diary_id = title_map.find(keyword);
 
@@ -316,11 +366,12 @@ public:
 
             } else {
                 // 倒排索引全文检索
+                std::lock_guard<std::mutex> lock(index_mutex());
                 auto& index = get_index();
-                int* doc_ids = new int[limit];
-                double* scores = new double[limit];
+                std::unique_ptr<int[]> doc_ids(new int[limit]);
+                std::unique_ptr<double[]> scores(new double[limit]);
 
-                int match_count = index.search(keyword, doc_ids, scores, limit);
+                int match_count = index.search(keyword, doc_ids.get(), scores.get(), limit);
 
                 json items = json::array();
                 for (int i = 0; i < match_count; i++) {
@@ -334,9 +385,6 @@ public:
                 result["data"] = items;
                 result["total"] = match_count;
                 result["mode"] = "fulltext";
-
-                delete[] doc_ids;
-                delete[] scores;
             }
         } catch (const std::exception& e) {
             result["error"] = std::string("日记搜索异常: ") + e.what();
@@ -415,6 +463,75 @@ public:
             delete[] compressed;
         } catch (const std::exception& e) {
             result["error"] = std::string("日记压缩异常: ") + e.what();
+        }
+        return result;
+    }
+
+    /**
+     * @brief Huffman 解压日记内容
+     *
+     * @param body JSON: {"diary_id": int} 或 {"base64": string}
+     * @return json 解压结果 {success, original_size, content}
+     */
+    static json decompress_diary(const json& body) {
+        json result;
+        try {
+            std::string base64_data;
+
+            if (body.contains("diary_id") && body["diary_id"].is_number()) {
+                int diary_id = body["diary_id"].get<int>();
+                if (diary_id <= 0) {
+                    result["error"] = "无效的日记ID";
+                    return result;
+                }
+                base64_data = repository::DiaryRepo::get_compressed(diary_id);
+                if (base64_data.empty()) {
+                    result["error"] = "日记未压缩或不存在";
+                    return result;
+                }
+            } else if (body.contains("base64") && body["base64"].is_string()) {
+                base64_data = body["base64"].get<std::string>();
+            } else {
+                result["error"] = "参数错误: 需要提供 diary_id 或 base64";
+                return result;
+            }
+
+            if (base64_data.empty()) {
+                result["error"] = "压缩数据为空";
+                return result;
+            }
+
+            // base64 解码为字节
+            int decoded_len = static_cast<int>(base64_data.size() / 4 * 3);
+            if (base64_data.size() >= 1 && base64_data[base64_data.size() - 1] == '=') decoded_len--;
+            if (base64_data.size() >= 2 && base64_data[base64_data.size() - 2] == '=') decoded_len--;
+
+            std::unique_ptr<unsigned char[]> decoded(new unsigned char[decoded_len]);
+            int actual_len = base64_decode(base64_data, decoded.get(), decoded_len);
+
+            if (actual_len <= 0) {
+                result["error"] = "Base64 解码失败";
+                return result;
+            }
+
+            // Huffman 解压
+            unsigned char* decompressed = nullptr;
+            int decompressed_size = algorithm::Huffman::decompress(
+                decoded.get(), actual_len, &decompressed);
+
+            if (decompressed_size <= 0 || !decompressed) {
+                result["error"] = "Huffman 解压失败";
+                return result;
+            }
+
+            std::string content(reinterpret_cast<char*>(decompressed), decompressed_size);
+            delete[] decompressed;
+
+            result["success"] = true;
+            result["original_size"] = decompressed_size;
+            result["content"] = content;
+        } catch (const std::exception& e) {
+            result["error"] = std::string("日记解压异常: ") + e.what();
         }
         return result;
     }

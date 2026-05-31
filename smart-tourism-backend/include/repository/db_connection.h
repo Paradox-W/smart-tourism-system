@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <functional>
+#include <mutex>
 
 /**
  * SQLite 数据库连接管理器
@@ -95,6 +96,7 @@ private:
     sqlite3* db_ = nullptr;
     std::string db_path_;
     bool in_transaction_ = false;
+    mutable std::recursive_mutex mutex_;
 
     void close();
 };

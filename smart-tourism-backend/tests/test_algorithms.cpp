@@ -64,6 +64,9 @@ static int passed_tests = 0;
 #define ASSERT_NEAR(a, b, eps) \
     do { if (fabs((a) - (b)) > (eps)) { FAIL(#a " != " #b); return; } } while(0)
 
+#define ASSERT(expr) \
+    do { if (!(expr)) { FAIL(#expr " is false"); return; } } while(0)
+
 // ============================================================
 // 1. Graph 测试
 // ============================================================
@@ -155,8 +158,8 @@ void test_heap() {
         int result[3];
         int k = top_k_largest(data, 10, 3, result);
         ASSERT_EQ(k, 3);
-        ASSERT_EQ(result[0], 6);   // 从大到小
-        ASSERT_EQ(result[1], 5);
+        ASSERT_EQ(result[0], 9);   // 从大到小
+        ASSERT_EQ(result[1], 6);
         ASSERT_EQ(result[2], 5);
         PASS();
     }

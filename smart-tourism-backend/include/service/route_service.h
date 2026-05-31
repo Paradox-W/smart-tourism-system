@@ -17,6 +17,7 @@
 #include "repository/spot_repo.h"
 #include <string>
 #include <cmath>
+#include <memory>
 
 using json = nlohmann::json;
 
@@ -45,8 +46,8 @@ public:
             return {{"error", "area_id, from_node, to_node are required"}};
         }
 
-        // 构建图
-        algorithm::Graph g;
+        // 构建图（有向图：单向道路只加正向边，双向道路加两条方向相反的边）
+        algorithm::Graph g(algorithm::Graph::Type::DIRECTED);
         auto id_to_idx = build_graph(g, area_id);
         if (id_to_idx.size() == 0) {
             return {{"error", "No graph data found for area_id"}, {"area_id", area_id}};
@@ -119,8 +120,8 @@ public:
             return {{"error", "waypoints array is required"}};
         }
 
-        // 构建图
-        algorithm::Graph g;
+        // 构建图（有向图：单向道路只加正向边，双向道路加两条方向相反的边）
+        algorithm::Graph g(algorithm::Graph::Type::DIRECTED);
         auto id_to_idx = build_graph(g, area_id);
         if (id_to_idx.size() == 0) {
             return {{"error", "No graph data found for area_id"}};
@@ -139,12 +140,11 @@ public:
 
         // 提取途经点索引
         int wp_count = static_cast<int>(body["waypoints"].size());
-        int* wp_indices = new int[wp_count];
+        auto wp_indices = std::make_unique<int[]>(wp_count);
         for (int i = 0; i < wp_count; i++) {
             int wp_id = body["waypoints"][i].get<int>();
             auto it = id_to_idx.find(wp_id);
             if (!it.valid) {
-                delete[] wp_indices;
                 return {{"error", "Waypoint not found"}, {"waypoint_id", wp_id}};
             }
             wp_indices[i] = it.value;
@@ -155,7 +155,7 @@ public:
 
         // 求解TSP
         algorithm::TSPResult tsp_result = algorithm::TSP::solve(
-            g, from_it.value, end_idx, wp_indices, wp_count, strategy);
+            g, from_it.value, end_idx, wp_indices.get(), wp_count, strategy);
 
         json result;
         if (tsp_result.path_length == 0) {
@@ -178,7 +178,6 @@ public:
             result["time"] = tsp_result.total_time;
         }
 
-        delete[] wp_indices;
         return result;
     }
 
@@ -203,9 +202,13 @@ private:
     /**
      * 从数据库构建 Graph 对象
      * 返回 node_db_id -> graph_index 的映射
+     *
+     * 注意：图使用有向模式，单向道路（is_bidirectional=0）只加一条方向边，
+     * 双向道路显式加两条方向相反的边。这样路线规划结果才能正确反映
+     * 现实中的单行道约束。
      */
     static algorithm::IntHashMap build_graph(algorithm::Graph& g, int area_id) {
-        algorithm::IntHashMap id_to_idx(64);
+        algorithm::IntHashMap id_to_idx(4096);
 
         // 加载节点
         json nodes = repository::SpotRepo::get_nodes(area_id);
@@ -240,10 +243,11 @@ private:
             int* from_idx = id_to_idx.get(from_db);
             int* to_idx = id_to_idx.get(to_db);
             if (from_idx && to_idx) {
+                // 总是添加正向边
                 g.add_edge(*from_idx, *to_idx, distance, congestion, transport);
-                if (!is_bidir) {
-                    // 对于有向边，需要移除反向边（因为Graph默认是无向的）
-                    // 简化处理：这里假设Graph构建时是有向的
+                // 双向道路：额外添加反向边
+                if (is_bidir != 0) {
+                    g.add_edge(*to_idx, *from_idx, distance, congestion, transport);
                 }
             }
         }

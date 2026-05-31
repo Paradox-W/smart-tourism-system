@@ -84,7 +84,7 @@ private:
         }
 
         for (int i = 0; i < n && count < max_results; i++) {
-            const TrieNode** child_ptr = node->children.find(keys[i]);
+            TrieNode* const* child_ptr = node->children.find(keys[i]);
             if (child_ptr) {
                 count += collect_all(*child_ptr, prefix + keys[i],
                                      results + count, max_results - count);
@@ -118,7 +118,7 @@ private:
         }
 
         for (int i = 0; i < n && count < max_results; i++) {
-            const TrieNode** child_ptr = node->children.find(keys[i]);
+            TrieNode* const* child_ptr = node->children.find(keys[i]);
             if (child_ptr) {
                 count += collect_frequent(*child_ptr, prefix + keys[i],
                                           results + count, freqs + count, max_results - count);
@@ -142,7 +142,7 @@ public:
             char c = static_cast<char>(tolower(static_cast<unsigned char>(word[i])));
             if (c < 'a' || c > 'z') continue;  // 跳过非字母字符
 
-            const TrieNode** child = cur->children.find(c);
+            TrieNode* const* child = cur->children.find(c);
             if (!child) {
                 TrieNode* new_node = new TrieNode(c);
                 cur->children.insert(c, new_node);
@@ -166,7 +166,7 @@ public:
         for (size_t i = 0; i < word.size(); i++) {
             char c = static_cast<char>(tolower(static_cast<unsigned char>(word[i])));
             if (c < 'a' || c > 'z') continue;
-            const TrieNode** child = cur->children.find(c);
+            TrieNode* const* child = cur->children.find(c);
             if (!child) return false;
             cur = *child;
         }
@@ -179,7 +179,7 @@ public:
         for (size_t i = 0; i < word.size(); i++) {
             char c = static_cast<char>(tolower(static_cast<unsigned char>(word[i])));
             if (c < 'a' || c > 'z') continue;
-            const TrieNode** child = cur->children.find(c);
+            TrieNode* const* child = cur->children.find(c);
             if (!child) return 0;
             cur = *child;
         }
@@ -196,7 +196,7 @@ public:
         for (size_t i = 0; i < prefix.size(); i++) {
             char c = static_cast<char>(tolower(static_cast<unsigned char>(prefix[i])));
             if (c < 'a' || c > 'z') continue;
-            const TrieNode** child = cur->children.find(c);
+            TrieNode* const* child = cur->children.find(c);
             if (!child) return 0;
             cur = *child;
         }
@@ -210,7 +210,7 @@ public:
         for (size_t i = 0; i < prefix.size(); i++) {
             char c = static_cast<char>(tolower(static_cast<unsigned char>(prefix[i])));
             if (c < 'a' || c > 'z') continue;
-            const TrieNode** child = cur->children.find(c);
+            TrieNode* const* child = cur->children.find(c);
             if (!child) return 0;
             cur = *child;
         }
@@ -223,7 +223,7 @@ public:
         for (size_t i = 0; i < prefix.size(); i++) {
             char c = static_cast<char>(tolower(static_cast<unsigned char>(prefix[i])));
             if (c < 'a' || c > 'z') continue;
-            const TrieNode** child = cur->children.find(c);
+            TrieNode* const* child = cur->children.find(c);
             if (!child) return false;
             cur = *child;
         }
@@ -243,7 +243,7 @@ private:
         char keys[256];
         int n = node->children.get_all_keys(keys);
         for (int i = 0; i < n; i++) {
-            const TrieNode** child = node->children.find(keys[i]);
+            TrieNode* const* child = node->children.find(keys[i]);
             if (child) word_count_dfs(*child, count);
         }
     }

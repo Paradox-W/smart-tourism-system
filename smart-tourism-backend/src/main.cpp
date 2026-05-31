@@ -48,7 +48,7 @@ void print_banner(int port) {
     std::cout << R"(
 ╔══════════════════════════════════════════════════════╗
 ║                                                      ║
-║       智能旅游系统 Smart Tourism System v1.0         ║
+║       智能旅游系统 Smart Tourism System v1.0           ║
 ║                                                      ║
 ║       C++17 + cpp-httplib + SQLite3 + Vue 3          ║
 ║                                                      ║
