@@ -20,6 +20,7 @@
 #include "algorithm/edit_distance.h"
 #include "repository/food_repo.h"
 #include <string>
+#include <memory>
 
 using json = nlohmann::json;
 
@@ -76,7 +77,7 @@ public:
             int count = static_cast<int>(foods_json.size());
 
             // 构建 FoodScore 数组
-            FoodScore* foods = new FoodScore[count];
+            auto foods = std::make_unique<FoodScore[]>(count);
             for (int i = 0; i < count; i++) {
                 const auto& f = foods_json[i];
                 foods[i].id = f.value("id", 0);
@@ -107,12 +108,12 @@ public:
 
             // 使用 Top-K 堆排序取前 limit 个
             int k = (limit < count) ? limit : count;
-            FoodScore* top_k = new FoodScore[k];
+            auto top_k = std::make_unique<FoodScore[]>(k);
 
             auto get_score = [](const FoodScore& f) -> double { return f.score; };
 
             bool descending = (sort_by != "price_asc"); // price_asc 使用升序
-            int actual_k = algorithm::top_k_by_score(foods, count, k, top_k, get_score, descending);
+            int actual_k = algorithm::top_k_by_score(foods.get(), count, k, top_k.get(), get_score, descending);
 
             // 构建返回结果
             json items = json::array();
@@ -147,9 +148,6 @@ public:
             result["data"] = items;
             result["total"] = total;
             result["limit"] = actual_k;
-
-            delete[] foods;
-            delete[] top_k;
         } catch (const std::exception& e) {
             result["error"] = std::string("美食推荐服务异常: ") + e.what();
         }
@@ -200,19 +198,19 @@ public:
             }
 
             int name_count = static_cast<int>(names_json.size());
-            std::string* names = new std::string[name_count];
+            auto names = std::make_unique<std::string[]>(name_count);
             for (int i = 0; i < name_count; i++) {
                 names[i] = names_json[i].value("name", "");
             }
 
             // 使用编辑距离 Top-K 模糊匹配
             int k = (limit < name_count) ? limit : name_count;
-            int* result_indices = new int[k];
-            double* result_sims = new double[k];
+            auto result_indices = std::make_unique<int[]>(k);
+            auto result_sims = std::make_unique<double[]>(k);
 
             int match_count = algorithm::EditDistance::fuzzy_match_top_k(
-                keyword, names, name_count,
-                result_indices, result_sims,
+                keyword, names.get(), name_count,
+                result_indices.get(), result_sims.get(),
                 k, 0.3  // 相似度阈值 0.3
             );
 
@@ -228,10 +226,6 @@ public:
             result["data"] = items;
             result["total"] = match_count;
             result["mode"] = "fuzzy";
-
-            delete[] names;
-            delete[] result_indices;
-            delete[] result_sims;
         } catch (const std::exception& e) {
             result["error"] = std::string("美食搜索服务异常: ") + e.what();
         }

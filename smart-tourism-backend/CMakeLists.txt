@@ -9,9 +9,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # 输出目录
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# 覆盖默认 Debug 编译标志（去掉 -g，用 -gdwarf-4 代替）
-set(CMAKE_C_FLAGS_DEBUG "-O0" CACHE STRING "" FORCE)
-set(CMAKE_CXX_FLAGS_DEBUG "-O0" CACHE STRING "" FORCE)
+# 覆盖默认 Debug 编译标志
+if(MSVC)
+    set(CMAKE_C_FLAGS_DEBUG "/Od" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_DEBUG "/Od" CACHE STRING "" FORCE)
+else()
+    set(CMAKE_C_FLAGS_DEBUG "-O0" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0" CACHE STRING "" FORCE)
+endif()
 
 # ============================================================
 # 头文件目录
@@ -77,16 +82,22 @@ if(WIN32 AND NOT MSVC)
 endif()
 
 # ============================================================
-# 强制使用 gdwarf-4（binutils as 可能不支持 gdwarf-5）
-add_compile_options(-gdwarf-4)
-
-# 编译选项（不重复 -g，由 -gdwarf-4 提供调试信息）
+# 编译选项
 # ============================================================
-target_compile_options(${PROJECT_NAME} PRIVATE
-    -Wall -Wextra -Wpedantic
-    $<$<CONFIG:Debug>:-O0>
-    $<$<CONFIG:Release>:-O2>
-)
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        /utf-8
+        /W4
+        $<$<CONFIG:Debug>:/Od>
+        $<$<CONFIG:Release>:/O2>
+    )
+else()
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        -Wall -Wextra -Wpedantic
+        $<$<CONFIG:Debug>:-O0>
+        $<$<CONFIG:Release>:-O2>
+    )
+endif()
 
 # ============================================================
 # 算法测试编译选项

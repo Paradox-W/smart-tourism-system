@@ -38,9 +38,9 @@ public:
             return {{"error", "area_id and node_id are required"}};
         }
 
-        // 构建图
-        algorithm::Graph g;
-        algorithm::IntHashMap id_to_idx(64);
+        // 构建图（有向图：单向道路只加正向边，双向道路加两条方向相反的边）
+        algorithm::Graph g(algorithm::Graph::Type::DIRECTED);
+        algorithm::IntHashMap id_to_idx(4096);
 
         json nodes = repository::SpotRepo::get_nodes(area_id);
         for (const auto& n : nodes) {
@@ -63,10 +63,16 @@ public:
             double distance = r.value("distance", 0.0);
             double congestion = r.value("congestion", 0.5);
             int transport = r.value("transport", 0);
+            int is_bidir = r.value("is_bidirectional", 1);
             int* from_idx = id_to_idx.get(from_db);
             int* to_idx = id_to_idx.get(to_db);
             if (from_idx && to_idx) {
+                // 总是添加正向边
                 g.add_edge(*from_idx, *to_idx, distance, congestion, transport);
+                // 双向道路：额外添加反向边
+                if (is_bidir != 0) {
+                    g.add_edge(*to_idx, *from_idx, distance, congestion, transport);
+                }
             }
         }
 

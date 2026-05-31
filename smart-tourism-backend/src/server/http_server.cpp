@@ -197,10 +197,17 @@ void HttpServer::register_spot_routes() {
                 sort_by, limit, user_id, type, category);
             // service 返回 {data: [...], total}，拆开平铺，前端期望 data=数组
             json resp;
-            resp["code"] = 200;
-            resp["message"] = "success";
-            resp["data"] = result.value("data", json::array());
-            resp["total"] = result.value("total", 0);
+            if (result.contains("error")) {
+                resp["code"] = 500;
+                resp["message"] = result["error"];
+                resp["data"] = json::array();
+                resp["total"] = 0;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = "success";
+                resp["data"] = result.value("data", json::array());
+                resp["total"] = result.value("total", 0);
+            }
             res.set_content(resp.dump(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
@@ -218,11 +225,17 @@ void HttpServer::register_spot_routes() {
             std::string limit_str = req.get_param_value("limit");
             int limit = limit_str.empty() ? 20 : std::stoi(limit_str);
             json result = service::RecommendService::search_spots(keyword, limit);
-            // search_spots 返回数组，直接作为 data 字段
+            // search_spots 返回数组或错误对象
             json resp;
-            resp["code"] = 200;
-            resp["message"] = "success";
-            resp["data"] = result.is_array() ? result : json::array();
+            if (result.contains("error")) {
+                resp["code"] = 500;
+                resp["message"] = result["error"];
+                resp["data"] = json::array();
+            } else {
+                resp["code"] = 200;
+                resp["message"] = "success";
+                resp["data"] = result.is_array() ? result : json::array();
+            }
             res.set_content(resp.dump(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
@@ -234,10 +247,14 @@ void HttpServer::register_spot_routes() {
         try {
             int spot_id = std::stoi(req.matches[1]);
             json result = service::RecommendService::get_spot_detail(spot_id);
-            if (result.is_null()) {
+            if (result.is_null() || !result.contains("id")) {
                 res.set_content(Response::not_found("Spot not found").dump(), "application/json");
             } else {
-                res.set_content(Response::ok(result).dump(), "application/json");
+                json resp;
+                resp["code"] = 200;
+                resp["message"] = "success";
+                resp["data"] = result;
+                res.set_content(resp.dump(), "application/json");
             }
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
@@ -261,10 +278,17 @@ void HttpServer::register_spot_routes() {
                 sort_by, page_size, -1, type, category);
             // 同样解包：data=数组，total=数字
             json resp;
-            resp["code"] = 200;
-            resp["message"] = "success";
-            resp["data"] = result.value("data", json::array());
-            resp["total"] = result.value("total", 0);
+            if (result.contains("error")) {
+                resp["code"] = 500;
+                resp["message"] = result["error"];
+                resp["data"] = json::array();
+                resp["total"] = 0;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = "success";
+                resp["data"] = result.value("data", json::array());
+                resp["total"] = result.value("total", 0);
+            }
             res.set_content(resp.dump(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
@@ -361,7 +385,21 @@ void HttpServer::register_diary_routes() {
             int dest_id = dest_str.empty() ? -1 : std::stoi(dest_str);
 
             json result = service::DiaryService::get_diaries(page, page_size, sort_by, order, dest_id);
-            res.set_content(Response::ok(result).dump(), "application/json");
+            json resp;
+            resp["code"] = 200;
+            resp["message"] = "success";
+            // result 可能是数组（正常）或含 error 的对象
+            if (result.is_array()) {
+                resp["data"] = result;
+                resp["total"] = static_cast<int>(result.size());
+                resp["page"] = page;
+                resp["page_size"] = page_size;
+            } else {
+                resp["data"] = json::array();
+                resp["total"] = 0;
+                if (result.contains("error")) resp["message"] = result["error"];
+            }
+            res.set_content(resp.dump(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
         }
@@ -372,10 +410,14 @@ void HttpServer::register_diary_routes() {
         try {
             int id = std::stoi(req.matches[1]);
             json result = service::DiaryService::get_diary(id);
-            if (result.is_null()) {
+            if (result.is_null() || !result.contains("id")) {
                 res.set_content(Response::not_found("Diary not found").dump(), "application/json");
             } else {
-                res.set_content(Response::ok(result).dump(), "application/json");
+                json resp;
+                resp["code"] = 200;
+                resp["message"] = "success";
+                resp["data"] = result;
+                res.set_content(resp.dump(), "application/json");
             }
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
@@ -387,7 +429,17 @@ void HttpServer::register_diary_routes() {
         try {
             json body = json::parse(req.body);
             json result = service::DiaryService::create_diary(body);
-            res.set_content(Response::ok(result, "Diary created").dump(), "application/json");
+            json resp;
+            if (result.contains("error")) {
+                resp["code"] = 400;
+                resp["message"] = result["error"];
+                resp["data"] = nullptr;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = result.value("message", "Diary created");
+                resp["data"] = result;
+            }
+            res.set_content(resp.dump(), "application/json");
         } catch (const json::parse_error&) {
             res.set_content(Response::bad_request("Invalid JSON").dump(), "application/json");
         } catch (const std::exception& e) {
@@ -401,7 +453,17 @@ void HttpServer::register_diary_routes() {
             int id = std::stoi(req.matches[1]);
             json body = json::parse(req.body);
             json result = service::DiaryService::update_diary(id, body);
-            res.set_content(Response::ok(result, "Diary updated").dump(), "application/json");
+            json resp;
+            if (result.contains("error")) {
+                resp["code"] = 400;
+                resp["message"] = result["error"];
+                resp["data"] = nullptr;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = result.value("message", "Diary updated");
+                resp["data"] = result;
+            }
+            res.set_content(resp.dump(), "application/json");
         } catch (const json::parse_error&) {
             res.set_content(Response::bad_request("Invalid JSON").dump(), "application/json");
         } catch (const std::exception& e) {
@@ -414,7 +476,17 @@ void HttpServer::register_diary_routes() {
         try {
             int id = std::stoi(req.matches[1]);
             json result = service::DiaryService::delete_diary(id);
-            res.set_content(Response::ok(result, "Diary deleted").dump(), "application/json");
+            json resp;
+            if (result.contains("error")) {
+                resp["code"] = 400;
+                resp["message"] = result["error"];
+                resp["data"] = nullptr;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = result.value("message", "Diary deleted");
+                resp["data"] = result;
+            }
+            res.set_content(resp.dump(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
         }
@@ -434,7 +506,14 @@ void HttpServer::register_diary_routes() {
             int limit = limit_str.empty() ? 20 : std::stoi(limit_str);
 
             json result = service::DiaryService::search_diaries(keyword, mode, limit);
-            res.set_content(Response::ok(result).dump(), "application/json");
+            json resp;
+            resp["code"] = 200;
+            resp["message"] = "success";
+            resp["data"] = result.value("data", json::array());
+            resp["total"] = result.value("total", 0);
+            resp["mode"] = result.value("mode", mode);
+            if (result.contains("error")) resp["message"] = result["error"];
+            res.set_content(resp.dump(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");
         }
@@ -445,7 +524,40 @@ void HttpServer::register_diary_routes() {
         try {
             json body = json::parse(req.body);
             json result = service::DiaryService::compress_diary(body);
-            res.set_content(Response::ok(result).dump(), "application/json");
+            json resp;
+            if (result.contains("error")) {
+                resp["code"] = 400;
+                resp["message"] = result["error"];
+                resp["data"] = nullptr;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = "success";
+                resp["data"] = result;
+            }
+            res.set_content(resp.dump(), "application/json");
+        } catch (const json::parse_error&) {
+            res.set_content(Response::bad_request("Invalid JSON").dump(), "application/json");
+        } catch (const std::exception& e) {
+            res.set_content(Response::server_error(e.what()).dump(), "application/json");
+        }
+    });
+
+    // POST /api/diaries/decompress — Huffman 解压
+    server_.Post("/api/diaries/decompress", [](const httplib::Request& req, httplib::Response& res) {
+        try {
+            json body = json::parse(req.body);
+            json result = service::DiaryService::decompress_diary(body);
+            json resp;
+            if (result.contains("error")) {
+                resp["code"] = 400;
+                resp["message"] = result["error"];
+                resp["data"] = nullptr;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = "success";
+                resp["data"] = result;
+            }
+            res.set_content(resp.dump(), "application/json");
         } catch (const json::parse_error&) {
             res.set_content(Response::bad_request("Invalid JSON").dump(), "application/json");
         } catch (const std::exception& e) {
@@ -461,7 +573,17 @@ void HttpServer::register_diary_routes() {
             int user_id = body.value("user_id", 1);
             int score = body.value("score", 5);
             json result = service::DiaryService::rate_diary(user_id, diary_id, score);
-            res.set_content(Response::ok(result).dump(), "application/json");
+            json resp;
+            if (result.contains("error")) {
+                resp["code"] = 400;
+                resp["message"] = result["error"];
+                resp["data"] = nullptr;
+            } else {
+                resp["code"] = 200;
+                resp["message"] = result.value("message", "success");
+                resp["data"] = result;
+            }
+            res.set_content(resp.dump(), "application/json");
         } catch (const json::parse_error&) {
             res.set_content(Response::bad_request("Invalid JSON").dump(), "application/json");
         } catch (const std::exception& e) {
@@ -522,6 +644,39 @@ void HttpServer::register_food_routes() {
             resp["data"] = result.value("data", json::array());
             resp["total"] = result.value("total", 0);
             resp["mode"] = result.value("mode", "");
+            res.set_content(resp.dump(), "application/json");
+        } catch (const std::exception& e) {
+            res.set_content(Response::server_error(e.what()).dump(), "application/json");
+        }
+    });
+
+    // GET /api/foods — 分页美食列表
+    server_.Get("/api/foods", [](const httplib::Request& req, httplib::Response& res) {
+        try {
+            std::string area_id_str = req.get_param_value("area_id");
+            if (area_id_str.empty()) {
+                res.set_content(Response::bad_request("area_id is required").dump(), "application/json");
+                return;
+            }
+            int area_id = std::stoi(area_id_str);
+            std::string sort_by = req.get_param_value("sort_by");
+            if (sort_by.empty()) sort_by = "rating";
+            std::string cuisine = req.get_param_value("cuisine");
+            std::string page_str = req.get_param_value("page");
+            int page = page_str.empty() ? 1 : std::stoi(page_str);
+            std::string size_str = req.get_param_value("page_size");
+            int page_size = size_str.empty() ? 20 : std::stoi(size_str);
+
+            json foods = repository::FoodRepo::get_all(area_id, page, page_size, sort_by, cuisine);
+            int total = repository::FoodRepo::count(area_id, cuisine);
+
+            json resp;
+            resp["code"] = 200;
+            resp["message"] = "success";
+            resp["data"] = foods;
+            resp["total"] = total;
+            resp["page"] = page;
+            resp["page_size"] = page_size;
             res.set_content(resp.dump(), "application/json");
         } catch (const std::exception& e) {
             res.set_content(Response::server_error(e.what()).dump(), "application/json");

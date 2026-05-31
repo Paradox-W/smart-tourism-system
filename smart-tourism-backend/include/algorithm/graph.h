@@ -83,12 +83,13 @@ private:
 
     void expand() {
         int new_cap = capacity_ == 0 ? 4 : capacity_ * 2;
-        T* new_data = new T[new_cap];
+        // 使用原始内存分配（不构造对象），配合 placement new 手动控制生命周期
+        T* new_data = static_cast<T*>(operator new[](sizeof(T) * static_cast<size_t>(new_cap)));
         for (int i = 0; i < size_; i++) {
             new (&new_data[i]) T(static_cast<T&&>(data_[i]));
             data_[i].~T();
         }
-        delete[] data_;
+        operator delete[](data_);
         data_ = new_data;
         capacity_ = new_cap;
     }
@@ -97,7 +98,10 @@ public:
     DynamicArray() : data_(nullptr), size_(0), capacity_(0) {}
 
     ~DynamicArray() {
-        delete[] data_;
+        for (int i = 0; i < size_; i++) {
+            data_[i].~T();
+        }
+        operator delete[](data_);
     }
 
     // 禁止拷贝
@@ -114,7 +118,8 @@ public:
 
     DynamicArray& operator=(DynamicArray&& other) noexcept {
         if (this != &other) {
-            delete[] data_;
+            for (int i = 0; i < size_; i++) data_[i].~T();
+            operator delete[](data_);
             data_ = other.data_;
             size_ = other.size_;
             capacity_ = other.capacity_;
@@ -138,14 +143,20 @@ public:
     }
 
     void pop_back() {
-        if (size_ > 0) --size_;
+        if (size_ > 0) {
+            --size_;
+            data_[size_].~T();
+        }
     }
 
     int size() const { return size_; }
 
     bool empty() const { return size_ == 0; }
 
-    void clear() { size_ = 0; }
+    void clear() {
+        for (int i = 0; i < size_; i++) data_[i].~T();
+        size_ = 0;
+    }
 
     T& operator[](int idx) {
         if (idx < 0 || idx >= size_) throw std::out_of_range("DynamicArray index out of range");

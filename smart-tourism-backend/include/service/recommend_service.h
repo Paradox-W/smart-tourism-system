@@ -14,6 +14,7 @@
 #include "algorithm/heap.h"
 #include "repository/spot_repo.h"
 #include <string>
+#include <memory>
 
 using json = nlohmann::json;
 
@@ -42,13 +43,13 @@ private:
     /**
      * @brief 从景点 JSON 数组中提取 SpotScore 列表
      */
-    static SpotScore* extract_spots(const json& spots_json, int& count) {
+    static std::unique_ptr<SpotScore[]> extract_spots(const json& spots_json, int& count) {
         if (!spots_json.is_array() || spots_json.empty()) {
             count = 0;
             return nullptr;
         }
         count = static_cast<int>(spots_json.size());
-        SpotScore* spots = new SpotScore[count];
+        auto spots = std::make_unique<SpotScore[]>(count);
         for (int i = 0; i < count; i++) {
             const auto& s = spots_json[i];
             spots[i].id = s.value("id", 0);
@@ -136,7 +137,7 @@ public:
             }
 
             int count = 0;
-            SpotScore* spots = extract_spots(spots_json, count);
+            auto spots = extract_spots(spots_json, count);
             if (count == 0) {
                 result["data"] = json::array();
                 result["total"] = 0;
@@ -145,21 +146,21 @@ public:
 
             // 设置基础分数
             std::string effective_sort = sort_by;
-            set_scores(spots, count, effective_sort);
+            set_scores(spots.get(), count, effective_sort);
 
             // 个性化推荐：加载用户兴趣并加权
             if (user_id > 0 && sort_by == "interest") {
                 json interests = repository::SpotRepo::get_user_interests(user_id);
-                apply_interest_weights(spots, count, interests);
+                apply_interest_weights(spots.get(), count, interests);
                 effective_sort = "interest"; // 确保按加权分数排序
             }
 
             // 使用 Top-K 堆排序取前 limit 个
             int k = (limit < count) ? limit : count;
-            SpotScore* top_k = new SpotScore[k];
+            auto top_k = std::make_unique<SpotScore[]>(k);
 
             auto get_score = [](const SpotScore& s) -> double { return s.score; };
-            int actual_k = algorithm::top_k_by_score(spots, count, k, top_k, get_score, true);
+            int actual_k = algorithm::top_k_by_score(spots.get(), count, k, top_k.get(), get_score, true);
 
             // 构建返回结果（已经是降序）
             json items = json::array();
@@ -184,9 +185,6 @@ public:
 
             result["data"] = items;
             result["total"] = count;
-
-            delete[] spots;
-            delete[] top_k;
         } catch (const std::exception& e) {
             result["error"] = std::string("推荐服务异常: ") + e.what();
         }

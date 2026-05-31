@@ -237,8 +237,10 @@
           </button>
           <button class="flex-1 py-2 rounded-xl text-sm text-white font-medium cursor-pointer transition-colors"
                   style="background: var(--color-primary)"
+                  :disabled="savingDiary"
+                  :class="{ 'opacity-60 cursor-not-allowed': savingDiary }"
                   @click="handleSaveDiary">
-            {{ editingDiary ? '保存修改' : '发布日记' }}
+            {{ savingDiary ? '发布中...' : (editingDiary ? '保存修改' : '发布日记') }}
           </button>
         </div>
       </template>
@@ -308,6 +310,19 @@
             Huffman 压缩
           </button>
           <button
+            v-if="currentDiary?.is_compressed"
+            class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all"
+            style="background: #E8F5E9; color: #2E7D32"
+            @click="handleDecompress"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/>
+              <path d="m14.5 4-5 16"/>
+            </svg>
+            Huffman 解压
+          </button>
+          <button
             class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all"
             style="background: var(--color-primary-bg); color: var(--color-primary)"
             @click="openEditDialog(currentDiary)"
@@ -339,7 +354,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   getDiaryList, getDiaryDetail, createDiary, updateDiary, deleteDiary,
-  searchDiaries, compressDiary, rateDiary,
+  searchDiaries, compressDiary, decompressDiary, rateDiary,
 } from '@/api/diary'
 import type { Diary, DiarySearchResult } from '@/types'
 
@@ -361,6 +376,7 @@ const detailDialogVisible = ref(false)
 const editingDiary = ref<Diary | null>(null)
 const currentDiary = ref<Diary | null>(null)
 const userRating = ref(0)
+const savingDiary = ref(false)
 
 // 压缩
 const compressResult = ref<{ original_size: number; compressed_size: number; compression_ratio: number } | null>(null)
@@ -473,6 +489,7 @@ function openEditDialog(diary: Diary) {
 }
 
 async function handleSaveDiary() {
+  if (savingDiary.value) return
   if (!diaryForm.title.trim()) {
     ElMessage.warning('请输入日记标题')
     return
@@ -482,6 +499,7 @@ async function handleSaveDiary() {
     return
   }
   try {
+    savingDiary.value = true
     const tags = diaryForm.tags.split(/[,，]/).map(t => t.trim()).filter(Boolean)
     if (editingDiary.value) {
       await updateDiary(editingDiary.value.id, {
@@ -505,6 +523,8 @@ async function handleSaveDiary() {
     loadDiaries()
   } catch (e) {
     console.error('保存日记失败:', e)
+  } finally {
+    savingDiary.value = false
   }
 }
 
@@ -559,6 +579,19 @@ async function handleCompress() {
     ElMessage.success(`压缩完成！压缩率: ${res.data.compression_ratio}%`)
   } catch (e) {
     console.error('压缩失败:', e)
+  }
+}
+
+async function handleDecompress() {
+  if (!currentDiary.value) return
+  try {
+    const res = await decompressDiary({ diary_id: currentDiary.value.id })
+    if (res.data.content && currentDiary.value) {
+      currentDiary.value.content = res.data.content
+    }
+    ElMessage.success(`解压完成！原始大小: ${res.data.original_size}B`)
+  } catch (e) {
+    console.error('解压失败:', e)
   }
 }
 

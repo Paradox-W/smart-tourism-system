@@ -97,12 +97,15 @@ private:
         bucket_count_ = new_bucket_count;
         size_ = 0;
 
-        // 重新插入所有元素（使用 move 避免 copy）
+        // 重新插入所有元素（使用 move 避免 copy），并释放旧节点
         for (int i = 0; i < old_count; i++) {
             HashNode<K, V>* cur = old_buckets[i].head;
+            old_buckets[i].head = nullptr;  // 防止 ~Bucket 重复释放已迁移的节点
             while (cur) {
+                HashNode<K, V>* next = cur->next;
                 insert(cur->key, static_cast<V&&>(cur->value));
-                cur = cur->next;
+                delete cur;
+                cur = next;
             }
         }
 

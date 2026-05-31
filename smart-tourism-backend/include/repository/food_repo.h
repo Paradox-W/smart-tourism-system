@@ -49,14 +49,14 @@ public:
 
         db.query(sql.str(), [&result](int cols, char** values, char**) {
             json item;
-            item["id"]          = std::stoi(values[0]);
-            item["area_id"]     = std::stoi(values[1]);
+            item["id"]          = values[0] ? std::stoi(values[0]) : 0;
+            item["area_id"]     = values[1] ? std::stoi(values[1]) : 0;
             item["name"]        = values[2] ? values[2] : "";
             item["cuisine"]     = values[3] ? values[3] : "";
             item["restaurant"]  = values[4] ? values[4] : "";
-            item["rating"]      = std::stod(values[5]);
-            item["rating_count"]= std::stoi(values[6]);
-            item["popularity"]  = std::stoi(values[7]);
+            item["rating"]      = values[5] ? std::stod(values[5]) : 0.0;
+            item["rating_count"]= values[6] ? std::stoi(values[6]) : 0;
+            item["popularity"]  = values[7] ? std::stoi(values[7]) : 0;
             item["node_id"]     = values[8] ? std::stoi(values[8]) : 0;
             item["price"]       = values[9] ? std::stod(values[9]) : 0.0;
             item["description"] = values[10] ? values[10] : "";
@@ -93,14 +93,14 @@ public:
 
         db.query(sql.str(), [&result](int cols, char** values, char**) {
             json item;
-            item["id"]          = std::stoi(values[0]);
-            item["area_id"]     = std::stoi(values[1]);
+            item["id"]          = values[0] ? std::stoi(values[0]) : 0;
+            item["area_id"]     = values[1] ? std::stoi(values[1]) : 0;
             item["name"]        = values[2] ? values[2] : "";
             item["cuisine"]     = values[3] ? values[3] : "";
             item["restaurant"]  = values[4] ? values[4] : "";
-            item["rating"]      = std::stod(values[5]);
-            item["rating_count"]= std::stoi(values[6]);
-            item["popularity"]  = std::stoi(values[7]);
+            item["rating"]      = values[5] ? std::stod(values[5]) : 0.0;
+            item["rating_count"]= values[6] ? std::stoi(values[6]) : 0;
+            item["popularity"]  = values[7] ? std::stoi(values[7]) : 0;
             item["node_id"]     = values[8] ? std::stoi(values[8]) : 0;
             item["price"]       = values[9] ? std::stod(values[9]) : 0.0;
             item["description"] = values[10] ? values[10] : "";
@@ -126,7 +126,7 @@ public:
 
         db.query(sql.str(), [&result](int cols, char** values, char**) {
             json item;
-            item["id"]   = std::stoi(values[0]);
+            item["id"]   = values[0] ? std::stoi(values[0]) : 0;
             item["name"] = values[1] ? values[1] : "";
             result.push_back(item);
             return true;
@@ -147,10 +147,12 @@ public:
         std::ostringstream sql;
         sql << "SELECT id, pos_x, pos_y FROM nodes WHERE id = " << node_id << " LIMIT 1";
 
-        bool found = db.query(sql.str(), [&result](int cols, char** values, char**) {
-            result["id"]    = std::stoi(values[0]);
-            result["pos_x"] = std::stod(values[1]);
-            result["pos_y"] = std::stod(values[2]);
+        bool found = false;
+        db.query(sql.str(), [&result, &found](int cols, char** values, char**) {
+            found = true;
+            result["id"]    = values[0] ? std::stoi(values[0]) : 0;
+            result["pos_x"] = values[1] ? std::stod(values[1]) : 0.0;
+            result["pos_y"] = values[2] ? std::stod(values[2]) : 0.0;
             return false;
         });
 

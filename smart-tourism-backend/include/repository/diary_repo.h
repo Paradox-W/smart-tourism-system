@@ -58,21 +58,21 @@ public:
 
         db.query(sql.str(), [&result](int cols, char** values, char**) {
             json item;
-            item["id"]              = std::stoi(values[0]);
-            item["user_id"]         = std::stoi(values[1]);
+            item["id"]              = values[0] ? std::stoi(values[0]) : 0;
+            item["user_id"]         = values[1] ? std::stoi(values[1]) : 0;
             item["username"]        = values[2] ? values[2] : "";
             item["nickname"]        = values[3] ? values[3] : "";
             item["title"]           = values[4] ? values[4] : "";
             item["content"]         = values[5] ? values[5] : "";
-            item["is_compressed"]   = std::stoi(values[6]) != 0;
+            item["is_compressed"]   = values[6] ? (std::stoi(values[6]) != 0) : false;
             item["destination"]     = values[7] ? values[7] : "";
             item["destination_id"]  = values[8] ? std::stoi(values[8]) : 0;
             item["tags"]            = values[9]  ? values[9]  : "[]";
             item["images"]          = values[10] ? values[10] : "[]";
             item["videos"]          = values[11] ? values[11] : "[]";
-            item["popularity"]      = std::stoi(values[12]);
-            item["avg_rating"]      = std::stod(values[13]);
-            item["rating_count"]    = std::stoi(values[14]);
+            item["popularity"]      = values[12] ? std::stoi(values[12]) : 0;
+            item["avg_rating"]      = values[13] ? std::stod(values[13]) : 0.0;
+            item["rating_count"]    = values[14] ? std::stoi(values[14]) : 0;
             item["created_at"]      = values[15] ? values[15] : "";
             item["updated_at"]      = values[16] ? values[16] : "";
             result.push_back(item);
@@ -85,7 +85,7 @@ public:
     /**
      * 获取单个日记详情
      * @param id 日记ID
-     * @return 日记对象，未找到时为null
+     * @return 日记对象，未找到时返回空对象
      */
     static json get_by_id(int id) {
         json result;
@@ -101,23 +101,25 @@ public:
             << "LEFT JOIN users u ON d.user_id = u.id "
             << "WHERE d.id = " << id << " LIMIT 1";
 
-        bool found = db.query(sql.str(), [&result](int cols, char** values, char**) {
-            result["id"]              = std::stoi(values[0]);
-            result["user_id"]         = std::stoi(values[1]);
+        bool found = false;
+        db.query(sql.str(), [&result, &found](int cols, char** values, char**) {
+            found = true;
+            result["id"]              = values[0] ? std::stoi(values[0]) : 0;
+            result["user_id"]         = values[1] ? std::stoi(values[1]) : 0;
             result["username"]        = values[2] ? values[2] : "";
             result["nickname"]        = values[3] ? values[3] : "";
             result["title"]           = values[4] ? values[4] : "";
             result["content"]         = values[5] ? values[5] : "";
             result["compressed_content"] = values[6] ? values[6] : "";
-            result["is_compressed"]   = std::stoi(values[7]) != 0;
+            result["is_compressed"]   = values[7] ? (std::stoi(values[7]) != 0) : false;
             result["destination"]     = values[8] ? values[8] : "";
             result["destination_id"]  = values[9] ? std::stoi(values[9]) : 0;
             result["tags"]            = values[10] ? values[10] : "[]";
             result["images"]          = values[11] ? values[11] : "[]";
             result["videos"]          = values[12] ? values[12] : "[]";
-            result["popularity"]      = std::stoi(values[13]);
-            result["avg_rating"]      = std::stod(values[14]);
-            result["rating_count"]    = std::stoi(values[15]);
+            result["popularity"]      = values[13] ? std::stoi(values[13]) : 0;
+            result["avg_rating"]      = values[14] ? std::stod(values[14]) : 0.0;
+            result["rating_count"]    = values[15] ? std::stoi(values[15]) : 0;
             result["created_at"]      = values[16] ? values[16] : "";
             result["updated_at"]      = values[17] ? values[17] : "";
             return false;
@@ -204,6 +206,8 @@ public:
                 sql << key << " = " << value.get<double>();
             } else if (value.is_boolean()) {
                 sql << key << " = " << (value.get<bool>() ? 1 : 0);
+            } else if (value.is_array() || value.is_object()) {
+                sql << key << " = '" << escape_sql(value.dump()) << "'";
             } else {
                 sql << key << " = '" << escape_sql(value.get<std::string>()) << "'";
             }
@@ -277,21 +281,21 @@ public:
 
         db.query(sql.str(), [&result](int cols, char** values, char**) {
             json item;
-            item["id"]              = std::stoi(values[0]);
-            item["user_id"]         = std::stoi(values[1]);
+            item["id"]              = values[0] ? std::stoi(values[0]) : 0;
+            item["user_id"]         = values[1] ? std::stoi(values[1]) : 0;
             item["username"]        = values[2] ? values[2] : "";
             item["nickname"]        = values[3] ? values[3] : "";
             item["title"]           = values[4] ? values[4] : "";
             item["content"]         = values[5] ? values[5] : "";
-            item["is_compressed"]   = std::stoi(values[6]) != 0;
+            item["is_compressed"]   = values[6] ? (std::stoi(values[6]) != 0) : false;
             item["destination"]     = values[7] ? values[7] : "";
             item["destination_id"]  = values[8] ? std::stoi(values[8]) : 0;
             item["tags"]            = values[9]  ? values[9]  : "[]";
             item["images"]          = values[10] ? values[10] : "[]";
             item["videos"]          = values[11] ? values[11] : "[]";
-            item["popularity"]      = std::stoi(values[12]);
-            item["avg_rating"]      = std::stod(values[13]);
-            item["rating_count"]    = std::stoi(values[14]);
+            item["popularity"]      = values[12] ? std::stoi(values[12]) : 0;
+            item["avg_rating"]      = values[13] ? std::stod(values[13]) : 0.0;
+            item["rating_count"]    = values[14] ? std::stoi(values[14]) : 0;
             item["created_at"]      = values[15] ? values[15] : "";
             item["updated_at"]      = values[16] ? values[16] : "";
             result.push_back(item);
@@ -315,7 +319,7 @@ public:
 
         db.query(sql, [&result](int cols, char** values, char**) {
             json item;
-            item["id"]      = std::stoi(values[0]);
+            item["id"]      = values[0] ? std::stoi(values[0]) : 0;
             item["title"]   = values[1] ? values[1] : "";
             item["content"] = values[2] ? values[2] : "";
             result.push_back(item);

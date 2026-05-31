@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <cstring>
+#include <mutex>
 
 // ============================================================
 // DBConnection 实现
@@ -62,6 +63,7 @@ DBConnection::~DBConnection() {
 }
 
 void DBConnection::close() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (db_) {
         if (in_transaction_) {
             sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
@@ -73,6 +75,7 @@ void DBConnection::close() {
 }
 
 std::string DBConnection::get_last_error() const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (db_) {
         return sqlite3_errmsg(db_);
     }
@@ -80,6 +83,7 @@ std::string DBConnection::get_last_error() const {
 }
 
 bool DBConnection::execute(const std::string& sql) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!db_) return false;
 
     char* err_msg = nullptr;
@@ -95,6 +99,7 @@ bool DBConnection::execute(const std::string& sql) {
 
 bool DBConnection::query(const std::string& sql,
                          const std::function<bool(int, char**, char**)>& callback) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!db_) return false;
 
     sqlite3_stmt* stmt = nullptr;
@@ -104,6 +109,12 @@ bool DBConnection::query(const std::string& sql,
         std::cerr << "[DB] Prepare Error: " << sqlite3_errmsg(db_) << std::endl;
         return false;
     }
+
+    // RAII 守卫：确保 sqlite3_finalize 在任何退出路径（含异常）都被调用
+    struct StmtGuard {
+        sqlite3_stmt* s;
+        ~StmtGuard() { if (s) sqlite3_finalize(s); }
+    } guard{stmt};
 
     int columns = sqlite3_column_count(stmt);
     bool result = true;
@@ -139,7 +150,6 @@ bool DBConnection::query(const std::string& sql,
         result = false;
     }
 
-    sqlite3_finalize(stmt);
     return result;
 }
 
@@ -159,6 +169,7 @@ bool DBConnection::execute_file(const std::string& file_path) {
 }
 
 bool DBConnection::begin_transaction() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (in_transaction_) return false;
     if (execute("BEGIN TRANSACTION;")) {
         in_transaction_ = true;
@@ -168,6 +179,7 @@ bool DBConnection::begin_transaction() {
 }
 
 bool DBConnection::commit() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!in_transaction_) return false;
     if (execute("COMMIT;")) {
         in_transaction_ = false;
@@ -178,6 +190,7 @@ bool DBConnection::commit() {
 }
 
 bool DBConnection::rollback() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!in_transaction_) return false;
     if (execute("ROLLBACK;")) {
         in_transaction_ = false;
@@ -211,6 +224,7 @@ std::string DBConnection::query_string(const std::string& sql,
 }
 
 int64_t DBConnection::last_insert_id() const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (db_) {
         return sqlite3_last_insert_rowid(db_);
     }
@@ -218,6 +232,7 @@ int64_t DBConnection::last_insert_id() const {
 }
 
 int DBConnection::changes_count() const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (db_) {
         return sqlite3_changes(db_);
     }
@@ -232,13 +247,10 @@ DBConnection Database::instance_;
 
 DBConnection& Database::get(const std::string& db_path,
                             const std::string& init_sql_path) {
-    // 简单的单例实现：首次调用时初始化
-    // 生产环境应使用更安全的双重检查锁模式
-    static bool initialized = false;
-    if (!initialized) {
-        // 使用默认参数（从 db_path = "data/tourism.db" 读取）
+    // 线程安全的单例初始化（C++11 call_once）
+    static std::once_flag init_flag;
+    std::call_once(init_flag, [&]() {
         instance_ = DBConnection(db_path, init_sql_path);
-        initialized = true;
-    }
+    });
     return instance_;
 }

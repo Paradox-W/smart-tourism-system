@@ -51,6 +51,15 @@ export function compressDiary(params: { diary_id?: number; content?: string }) {
   }>('/api/diaries/compress', params)
 }
 
+/** Huffman解压日记 */
+export function decompressDiary(params: { diary_id?: number; base64?: string }) {
+  return post<{
+    success: boolean
+    original_size: number
+    content: string
+  }>('/api/diaries/decompress', params)
+}
+
 /** 评分日记 */
 export function rateDiary(data: {
   user_id: number
