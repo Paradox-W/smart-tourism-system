@@ -135,7 +135,7 @@ public:
             bool operator<(const DistNode& o) const { return dist < o.dist; }
         };
 
-        Heap<DistNode, std::less<DistNode>> min_heap(n + 1);
+        Heap<DistNode, std::greater<DistNode>> min_heap(n + 1);
         min_heap.push(DistNode{0.0, source_idx});
 
         while (!min_heap.empty()) {

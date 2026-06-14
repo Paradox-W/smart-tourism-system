@@ -298,6 +298,7 @@
         <!-- 操作按钮 -->
         <div class="flex gap-2 pt-4 border-t" style="border-color: var(--color-primary-lightest)">
           <button
+            v-if="currentDiary.user_id === auth.user?.id || auth.isAdmin"
             class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all"
             style="background: #F3E5F5; color: #7B1FA2"
             @click="handleCompress"
@@ -323,6 +324,7 @@
             Huffman 解压
           </button>
           <button
+            v-if="currentDiary.user_id === auth.user?.id || auth.isAdmin"
             class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all"
             style="background: var(--color-primary-bg); color: var(--color-primary)"
             @click="openEditDialog(currentDiary)"
@@ -357,7 +359,9 @@ import {
   searchDiaries, compressDiary, decompressDiary, rateDiary,
 } from '@/api/diary'
 import type { Diary, DiarySearchResult } from '@/types'
+import { useAuthStore } from '@/stores/auth'
 
+const auth = useAuthStore()
 const diaries = ref<Diary[]>([])
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -511,7 +515,7 @@ async function handleSaveDiary() {
       ElMessage.success('日记已更新')
     } else {
       await createDiary({
-        user_id: 1, // 默认游客用户
+        user_id: auth.user!.id,
         title: diaryForm.title,
         content: diaryForm.content,
         destination: diaryForm.destination,
@@ -560,7 +564,7 @@ async function handleRate() {
   if (!currentDiary.value || !userRating.value) return
   try {
     await rateDiary({
-      user_id: 1,
+      user_id: auth.user!.id,
       diary_id: currentDiary.value.id,
       score: userRating.value,
     })
